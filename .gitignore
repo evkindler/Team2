@@ -47,3 +47,8 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+#model outputs (large files)
+*.db
+
+*.Rproj
