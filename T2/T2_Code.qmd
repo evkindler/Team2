@@ -4,6 +4,8 @@ format: html
 editor: visual
 ---
 
+# Load Libraries
+
 ```{r}
 library(tidyverse)
 library(sf)
@@ -14,9 +16,18 @@ library(maptiles)
 library(tidyterra)
 library(knitr)
 library(tigris)
+library(mapview)
+library(webshot)
+library(htmltools)
+library(mapview)
 
 sf::sf_use_s2(FALSE)
+
 ```
+
+# Compare Scenario Results
+
+## Load Base Scenario into Dataframe
 
 ```{r}
 base_db <- dbConnect(drv=RSQLite::SQLite(), 
@@ -30,6 +41,8 @@ base_db <- dbConnect(drv=RSQLite::SQLite(),
 base_tables <- dbListTables(base_db)
 ```
 
+### Examine Results 
+
 ```{r}
 base_trip_prod <- dbGetQuery(base_db, 'SELECT * FROM trip_prod')
 
@@ -38,6 +51,8 @@ dbDisconnect(base_db)
 head(base_trip_prod) |>
   kable()
 ```
+
+### Examine Work Trips
 
 ```{r}
 base_work_prod <- base_trip_prod |>
@@ -51,6 +66,8 @@ base_work_prod <- base_trip_prod |>
 head(base_work_prod) |>
   kable()
 ```
+
+### Examine Non-Work Trips
 
 ```{r}
 base_non_work_prod <- base_trip_prod |>
@@ -66,6 +83,8 @@ base_non_work_prod <- base_trip_prod |>
 head(base_non_work_prod) |>
   kable()
 ```
+
+### Aggregate to Census Blocks
 
 ```{r}
 base_block_prod <- base_trip_prod |>
@@ -86,6 +105,8 @@ base_block_prod <- base_trip_prod |>
 head(base_block_prod) |>
   kable()
 ```
+
+## Load Alternative Scenario into Dataframe and Examine Results
 
 ```{r}
 alt_db <- dbConnect(drv=RSQLite::SQLite(), 
@@ -117,6 +138,8 @@ head(alt_block_prod) |>
   kable()
 ```
 
+## Join Base and Alternative Scenario Results
+
 ```{r}
 tolerance <- 0.5
 
@@ -130,6 +153,8 @@ compare_prod <- full_join(base_block_prod, alt_block_prod) |>
          abs(dif_hbsr_p) > tolerance |
          abs(dif_hbpb_p) > tolerance)
 ```
+
+## Map Differences
 
 ```{r}
 ma_blocks <- blocks(state = "MA", 
@@ -174,9 +199,13 @@ leaflet(dif_blocks_prod) |>
               fillOpacity = 0.1,
               highlightOptions = highlightOptions(weight = 3,
                                                   fillOpacity = 0.5),
-              label = hb_prod_labels)
+              label = hb_prod_labels
+```
 
+# Export Data So Others Can Access It
 
+```{r}
+mapshot(map, file = "leaflet_map.png")
 ```
 
 ```{r}
@@ -186,7 +215,9 @@ write_csv(alt_trip_prod, here("T2",
                                "alt_trip_prod.csv"))
 ```
 
-# TRIP ATTRACTIONS
+# Trip Attractions
+
+## Load Base Scenario 
 
 ```{r}
 base_db <- dbConnect(drv=RSQLite::SQLite(), 
@@ -204,6 +235,8 @@ head(base_trip_attr) |>
 
 
 ```
+
+## Load Alternative Scenario and Join to Base Scenario
 
 ```{r}
 alt_db <- dbConnect(drv=RSQLite::SQLite(), 
@@ -238,6 +271,8 @@ compare_attr <- full_join(base_trip_attr, alt_trip_attr) |>
            abs(diff_nhbw_a) > tolerance |
            abs(diff_nhbnw_a) > tolerance)
 ```
+
+## Map Differences
 
 ```{r}
 dif_blocks_attr <- zones |>
@@ -276,6 +311,10 @@ leaflet(dif_blocks_attr) |>
               label = attr_labels)
 ```
 
+# Non-Home-Based Trip Productions
+
+## Load Base Scenario
+
 ```{r}
 base_db <- dbConnect(drv=RSQLite::SQLite(), 
                      dbname=here("model",
@@ -290,6 +329,8 @@ dbDisconnect(base_db)
 head(base_trip_nhb) |>
   kable()
 ```
+
+## Load Alternative Scenario and Join to Base Scenario
 
 ```{r}
 alt_db <- dbConnect(drv=RSQLite::SQLite(), 
@@ -310,6 +351,8 @@ compare_nhb <- full_join(base_trip_nhb, alt_trip_nhb) |>
   filter(abs(diff_nhbw_p) > tolerance |
            abs(diff_nhbnw_p) > tolerance)
 ```
+
+## Map Differences
 
 ```{r}
 dif_blocks_nhb <- zones |>
