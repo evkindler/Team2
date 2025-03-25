@@ -41,7 +41,7 @@ base_db <- dbConnect(drv=RSQLite::SQLite(),
 base_tables <- dbListTables(base_db)
 ```
 
-### Examine Results 
+### Examine Results
 
 ```{r}
 base_trip_prod <- dbGetQuery(base_db, 'SELECT * FROM trip_prod')
@@ -199,7 +199,7 @@ leaflet(dif_blocks_prod) |>
               fillOpacity = 0.1,
               highlightOptions = highlightOptions(weight = 3,
                                                   fillOpacity = 0.5),
-              label = hb_prod_labels
+              label = hb_prod_labels)
 ```
 
 # Export Data So Others Can Access It
@@ -217,7 +217,7 @@ write_csv(alt_trip_prod, here("T2",
 
 # Trip Attractions
 
-## Load Base Scenario 
+## Load Base Scenario
 
 ```{r}
 base_db <- dbConnect(drv=RSQLite::SQLite(), 
