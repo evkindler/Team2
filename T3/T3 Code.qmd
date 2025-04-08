@@ -1,0 +1,392 @@
+---
+title: "T3 Code"
+format: html
+editor: visual
+---
+
+## Load Libraries
+
+```{r}
+library(tidyverse)
+library(sf)
+library(DBI)
+library(here)
+library(leaflet)
+library(maptiles)
+library(tidyterra)
+library(knitr)
+library(tigris)
+library(omxr)
+library(scales)
+library(cowplot)
+library(RColorBrewer)
+library(chorddiag)
+library(units)
+
+sf::sf_use_s2(FALSE)
+```
+
+# Load Matrices
+
+### Base
+
+```{r}
+base_pa <- here("model",
+             "outputs",
+             "Base",
+             "_demand",
+             "td",
+             "base.omx") |>
+  read_all_omx(c("hb", "nhb")) |>
+  mutate(total_hh_trips = hb + nhb)
+
+head(base_pa) |>
+  kable(digits = 2)
+```
+
+### Alt
+
+```{r}
+alt_pa <- here("model",
+             "outputs",
+             "Alt",
+             "_demand",
+             "td",
+             "alt.omx") |>
+  read_all_omx(c("hb", "nhb"))|>
+  mutate(total_hh_trips = hb + nhb)
+
+head(alt_pa) |>
+  kable(digits = 2)
+```
+
+# Visualization
+
+### Locate TAZ IDs for OD
+
+```{r}
+TAZs <- here("model",
+             "inputs",
+             "zonal",
+             "shp",
+             "CTPS_TDM23_TAZ_2017g_v202303.shp") |>
+  st_read(quiet = TRUE) |>
+  st_transform("WGS84")
+
+leaflet(TAZs) |>
+  addProviderTiles(provider = "CartoDB.Positron") |>
+  addPolygons(weight = 2,
+              color = "orange",
+              fillColor = "orange",
+              fillOpacity = 0.1,
+              highlightOptions = highlightOptions(weight = 3,
+                                                  fillOpacity = 0.5),
+              label = TAZs$taz_id)
+```
+
+### Remove Problem Areas for Data
+
+```{r}
+TAZs <- TAZs |>
+  filter(state == "MA",
+         mpo != "BRPC",
+         mpo != "FRCOG")
+
+base_pa <- base_pa |>
+  filter(origin %in% TAZs$taz_id,
+         destination %in% TAZs$taz_id)
+
+alt_pa <- alt_pa |>
+  filter(origin %in% TAZs$taz_id,
+         destination %in% TAZs$taz_id)
+
+leaflet(TAZs) |>
+  addProviderTiles(provider = "CartoDB.Positron") |>
+  addPolygons(weight = 2,
+              color = "orange",
+              fillColor = "orange",
+              fillOpacity = 0.1,
+              highlightOptions = highlightOptions(weight = 3,
+                                                  fillOpacity = 0.5),
+              label = TAZs$taz_id)
+```
+
+# Intrazonal Trips
+
+### Set up Data
+
+```{r}
+base_productions <- base_pa |>
+  group_by(origin) |>
+  summarize(productions = sum(total_hh_trips)) |>
+  rename(taz_id = origin)
+
+base_attractions <- base_pa |>
+  group_by(destination) |>
+  summarize(attractions = sum(total_hh_trips)) |>
+  rename(taz_id = destination)
+
+base_intrazonal <- base_pa |>
+  filter(origin == destination) |>
+  select(origin, total_hh_trips) |>
+  rename(taz_id = origin,
+         intrazonal = total_hh_trips) |>
+  full_join(base_productions) |>
+  full_join(base_attractions) |>
+  filter(productions + attractions > 0) |>
+  mutate(pct_intra_attr = intrazonal / attractions,
+         pct_intra_prod = intrazonal / productions) 
+
+base_intrazonal <- TAZs |>
+  inner_join(base_intrazonal)
+
+base_map <- get_tiles(base_intrazonal,
+                      provider = "CartoDB.Positron",
+                      zoom = 8,
+                      crop = TRUE)
+```
+
+### Map of Intrazonal Trips
+
+```{r}
+ggplot(base_intrazonal) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(color = NA,
+          alpha = 0.7,
+          aes(fill = intrazonal)) +
+  scale_fill_viridis_c(transform = "log",
+                       breaks = breaks <- 10^seq(-3, 4, by=1),
+                       labels = c(formatC(breaks[1:3], 
+                                        format = "f",
+                                        digits = 3),
+                                  formatC(breaks[4:8],
+                                          format = "d",
+                                        big.mark = " ")),
+                       name = "Number of\nintrazonal trips") +
+  theme_void()
+```
+
+### Map of % of All Productions for Intrazonal Trips
+
+```{r}
+ggplot(base_intrazonal) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(color = NA,
+          alpha = 0.7,
+          aes(fill = pct_intra_prod)) +
+  scale_fill_viridis_c(name = "Intrazonal trips\n(% of productions)",
+                       breaks = breaks <- seq(0, 0.7, by=0.1),
+                       labels = paste0(round(breaks*100),"%")) +
+  theme_void()
+```
+
+### Map of % of All Attractions for Intrazonal Trips
+
+```{r}
+ggplot(base_intrazonal) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(color = NA,
+          alpha = 0.7,
+          aes(fill = pct_intra_attr)) +
+  scale_fill_viridis_c(name = "Intrazonal trips\n(% of attractions)",
+                       breaks = breaks <- seq(0, 0.9, by=0.1),
+                       labels = paste0(round(breaks*100),"%")) +
+  theme_void()
+```
+
+# Desire Lines
+
+### Create Zone Centroids
+
+```{r}
+TAZ_pts <- st_centroid(TAZs)
+
+leaflet(TAZ_pts) |>
+  addProviderTiles(provider = "CartoDB.Positron") |>
+  addCircleMarkers(weight = 2,
+             color = NA,
+             fillColor = "orange",
+             radius = 3,
+             fillOpacity = 0.6,
+             label = TAZ_pts$taz_id)
+```
+
+### Create Set of Desire Lines from Matrix
+
+```{r}
+make_desire_lines <- function(od_df,
+                              points,
+                              origin_column,
+                              destination_column,
+                              trips_column,
+                              taz_id_column) {
+  
+  od_df <- od_df |>
+    ungroup() |>
+    rename(origin = all_of(origin_column),
+           destination = all_of(destination_column),
+           trips = all_of(trips_column)) |>
+    select(origin, destination, trips) |>
+    filter(origin != destination)
+  
+  points <- points |>
+    rename(taz_id = all_of(taz_id_column))
+  
+  desire_line_data <- od_df |>
+    mutate(id = seq(1, nrow(od_df))) |>
+    pivot_longer(cols = c(origin, destination),
+                 names_to = "o_d",
+                 values_to = "taz_id") 
+
+  desire_lines <- points |>
+    right_join(desire_line_data) |>
+    group_by(id) |>
+    summarize(trips = mean(trips),
+              origin_taz = first(taz_id),
+              destin_taz = last(taz_id)) |>
+    ungroup() |>
+    select(origin_taz, destin_taz, trips) |>
+    st_cast("LINESTRING")
+  
+  desire_lines
+
+}
+```
+
+### Isolate Area with Change
+
+```{r}
+focus_area <- TAZ_pts[TAZ_pts$taz_id == 268,] |>
+  st_transform(2249) |>
+  st_buffer(dist = 5280)
+
+focus_area_pts <- TAZ_pts |>
+  st_transform(2249) |>
+  st_filter(focus_area) |>
+  st_transform("WGS84")
+
+leaflet(focus_area_pts) |>
+  addProviderTiles(provider = "CartoDB.Positron") |>
+  addCircleMarkers(weight = 2,
+             color = NA,
+             fillColor = "orange",
+             radius = 5,
+             fillOpacity = 0.6,
+             label = focus_area_pts$taz_id)
+```
+
+### Map Isolated Area
+
+```{r}
+focus_area_base_pa <- base_pa |>
+  filter(origin %in% focus_area_pts$taz_id,
+         destination %in% focus_area_pts$taz_id)
+
+desire_lines_base_focus <- make_desire_lines(od_df = focus_area_base_pa,
+                                             points = focus_area_pts,
+                                             origin_column = "origin",
+                                             destination_column = "destination",
+                                             trips_column = "total_hh_trips",
+                                             taz_id_column = "taz_id")
+
+base_map <- get_tiles(desire_lines_base_focus,
+                      provider = "CartoDB.Positron",
+                      zoom = 14,
+                      crop = TRUE)
+
+ggplot(desire_lines_base_focus) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(aes(linewidth = trips),
+          alpha = 0.1,
+          color = "coral") +
+  theme_void()
+```
+
+### Aggregate to Towns
+
+```{r}
+boston_town_pts <- TAZ_pts |>
+  filter(mpo == "BRMPO") |>
+  group_by(town) |>
+  summarise(n_zones = n()) |>
+  st_centroid()
+
+TAZ_town_codes <- st_drop_geometry(TAZ_pts) |>
+  filter(mpo == "BRMPO") |>
+  select(taz_id, town) 
+
+base_pa_towns <- base_pa |>
+  rename(taz_id = origin) |>
+  left_join(TAZ_town_codes) |>
+  rename(origin_town = town,
+         origin = taz_id) |>
+  rename(taz_id = destination) |>
+  left_join(TAZ_town_codes) |>
+  rename(destin_town = town,
+         destination = taz_id) |>
+  group_by(origin_town, destin_town) |>
+  summarize(trips = sum(total_hh_trips)) |>
+  filter(!is.na(origin_town),
+         !is.na(destin_town))
+```
+
+### Map Towns
+
+```{r}
+desire_lines_base_towns <- make_desire_lines(od_df = base_pa_towns,
+                                             points = boston_town_pts,
+                                             origin_column = "origin_town",
+                                             destination_column = "destin_town",
+                                             trips_column = "trips",
+                                             taz_id_column = "town")
+
+base_map <- get_tiles(desire_lines_base_towns,
+                      provider = "CartoDB.Positron",
+                      zoom = 10,
+                      crop = TRUE)
+
+ggplot(desire_lines_base_towns) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(aes(linewidth = trips),
+          alpha = 0.01,
+          color = "coral") +
+  theme_void()
+```
+
+### Aggregate to Fewer Towns
+
+```{r}
+fewer_towns <- c("CAMBRIDGE",
+                            "BOSTON",
+                            "SOMERVILLE",
+                            "MEDFORD",
+                            "EVERETT",
+                            "MALDEN")
+
+base_fewer_pa_towns <- base_pa_towns |>
+  filter(origin_town %in% fewer_towns,
+         destin_town %in% fewer_towns)
+
+desire_fewer_base_towns <- make_desire_lines(od_df = base_fewer_pa_towns,
+                                             points = boston_town_pts,
+                                             origin_column = "origin_town",
+                                             destination_column = "destin_town",
+                                             trips_column = "trips",
+                                             taz_id_column = "town")
+```
+
+### Map Fewer Towns
+
+```{r}
+base_map <- get_tiles(desire_fewer_base_towns,
+                      provider = "CartoDB.Positron",
+                      zoom = 13,
+                      crop = TRUE)
+
+ggplot(desire_fewer_base_towns) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(aes(linewidth = trips),
+          alpha = 0.5,
+          color = "coral") +
+  theme_void()
+```
