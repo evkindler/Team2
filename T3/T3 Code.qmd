@@ -169,15 +169,23 @@ ggplot(base_intrazonal) +
 ## Map of % of All Productions for Intrazonal Trips
 
 ```{r}
-ggplot(base_intrazonal) +
+breaks <- seq(0, 0.7, by = 0.1)
+
+p <- ggplot(base_intrazonal) +
   geom_spatraster_rgb(data = base_map) +
-  geom_sf(color = NA,
-          alpha = 0.7,
-          aes(fill = pct_intra_prod)) +
-  scale_fill_viridis_c(name = "Intrazonal trips\n(% of productions)",
-                       breaks = breaks <- seq(0, 0.7, by=0.1),
-                       labels = paste0(round(breaks*100),"%")) +
+  geom_sf(
+    color = NA,
+    alpha = 0.7,
+    aes(fill = pct_intra_prod)
+  ) +
+  scale_fill_viridis_c(
+    name = "Intrazonal trips\n(% of productions)",
+    breaks = breaks,
+    labels = paste0(round(breaks * 100), "%")
+  ) +
   theme_void()
+
+ggsave("intrazonal_productions_pct.png", plot = p, width = 10, height = 7, dpi = 300)
 ```
 
 ### Map of % of All Attractions for Intrazonal Trips
@@ -282,24 +290,30 @@ focus_area_base_pa <- base_pa |>
   filter(origin %in% focus_area_pts$taz_id,
          destination %in% focus_area_pts$taz_id)
 
-desire_lines_base_focus <- make_desire_lines(od_df = focus_area_base_pa,
-                                             points = focus_area_pts,
-                                             origin_column = "origin",
-                                             destination_column = "destination",
-                                             trips_column = "total_hh_trips",
-                                             taz_id_column = "taz_id")
+desire_lines_base_focus <- make_desire_lines(
+  od_df = focus_area_base_pa,
+  points = focus_area_pts,
+  origin_column = "origin",
+  destination_column = "destination",
+  trips_column = "total_hh_trips",
+  taz_id_column = "taz_id"
+)
 
-base_map <- get_tiles(desire_lines_base_focus,
-                      provider = "CartoDB.Positron",
-                      zoom = 14,
-                      crop = TRUE)
+base_map <- get_tiles(
+  x = desire_lines_base_focus,
+  provider = "CartoDB.Positron",
+  zoom = 14,
+  crop = TRUE
+)
 
-ggplot(desire_lines_base_focus) +
-  geom_spatraster_rgb(data = base_map) +
-  geom_sf(aes(linewidth = trips),
+p <- ggplot(desire_lines_base_focus) +
+  geom_spatraster_rgb(data = base_map) +     
+  geom_sf(aes(linewidth = trips),            
           alpha = 0.1,
           color = "coral") +
-  theme_void()
+  theme_void()                               
+
+ggsave("desire_lines_focus_area.png", plot = p, width = 8, height = 6, dpi = 300)
 ```
 
 ### Aggregate to Towns
@@ -333,24 +347,30 @@ base_pa_towns <- base_pa |>
 ### Map Towns
 
 ```{r}
-desire_lines_base_towns <- make_desire_lines(od_df = base_pa_towns,
-                                             points = boston_town_pts,
-                                             origin_column = "origin_town",
-                                             destination_column = "destin_town",
-                                             trips_column = "trips",
-                                             taz_id_column = "town")
+desire_lines_base_towns <- make_desire_lines(
+  od_df = base_pa_towns,
+  points = boston_town_pts,
+  origin_column = "origin_town",
+  destination_column = "destin_town",
+  trips_column = "trips",
+  taz_id_column = "town"
+)
 
-base_map <- get_tiles(desire_lines_base_towns,
-                      provider = "CartoDB.Positron",
-                      zoom = 10,
-                      crop = TRUE)
+base_map <- get_tiles(
+  x = desire_lines_base_towns,
+  provider = "CartoDB.Positron",
+  zoom = 10,
+  crop = TRUE
+)
 
-ggplot(desire_lines_base_towns) +
-  geom_spatraster_rgb(data = base_map) +
-  geom_sf(aes(linewidth = trips),
+p <- ggplot(desire_lines_base_towns) +
+  geom_spatraster_rgb(data = base_map) +          
+  geom_sf(aes(linewidth = trips),                
           alpha = 0.01,
           color = "coral") +
-  theme_void()
+  theme_void()                                    
+
+ggsave("desire_lines_town_level.png", plot = p, width = 10, height = 7, dpi = 300)
 ```
 
 ### Aggregate to Fewer Towns
@@ -378,17 +398,21 @@ desire_fewer_base_towns <- make_desire_lines(od_df = base_fewer_pa_towns,
 ### Map Fewer Towns
 
 ```{r}
-base_map <- get_tiles(desire_fewer_base_towns,
-                      provider = "CartoDB.Positron",
-                      zoom = 13,
-                      crop = TRUE)
+base_map <- get_tiles(
+  x = desire_fewer_base_towns,
+  provider = "CartoDB.Positron",
+  zoom = 13,
+  crop = TRUE
+)
 
-ggplot(desire_fewer_base_towns) +
-  geom_spatraster_rgb(data = base_map) +
-  geom_sf(aes(linewidth = trips),
+p <- ggplot(desire_fewer_base_towns) +
+  geom_spatraster_rgb(data = base_map) +       
+  geom_sf(aes(linewidth = trips),             
           alpha = 0.5,
           color = "coral") +
-  theme_void()
+  theme_void()                               
+
+ggsave("desire_lines_fewer_towns.png", plot = p, width = 10, height = 7, dpi = 300)
 ```
 
 ### Chord Diagrams
@@ -489,6 +513,22 @@ leaflet(changed_TAZs) |>
               label = change_labels)
 ```
 
+```{r}
+library(htmlwidgets)
+
+leaflet_map <- leaflet(changed_TAZs) |>
+  addProviderTiles(provider = "CartoDB.Positron") |>
+  addPolygons(weight = 2,
+              color = "orange",
+              fillColor = "orange",
+              fillOpacity = 0.1,
+              highlightOptions = highlightOptions(weight = 3,
+                                                  fillOpacity = 0.5),
+              label = change_labels)
+
+saveWidget(leaflet_map, "TAZ_change_map.html", selfcontained = TRUE)
+```
+
 ### Comparison Visualization
 
 ```{r}
@@ -504,39 +544,70 @@ interzonal_trips <- comparison |>
 ```{r}
 ggplot(intrazonal_trips) +
   geom_histogram(aes(x = difference),
-                 binwidth = 10,
+                 binwidth = 1,
                  fill = "orange",
                  alpha = 0.5,
                  color = "gray") +
-  scale_y_continuous(breaks = seq(0, 12, by=1),
-                     name = "Number of zones (among zones with\na difference of at least +/- 10 trips)") +
-  scale_x_continuous(breaks = seq(0, 600, by = 50),
+  scale_y_continuous(breaks = seq(0, 30, by=1),
+                     name = "Number of zones (among zones with\na difference of at least +/- 1 trips)") +
+  scale_x_continuous(breaks = seq(0, 40, by = 2),
                      name = "Difference in number of intrazonal trips") +
   theme_minimal()
+```
+
+```{r}
+p <- ggplot(intrazonal_trips) +
+  geom_histogram(aes(x = difference),
+                 binwidth = 1,
+                 fill = "orange",
+                 alpha = 0.5,
+                 color = "gray") +
+  scale_y_continuous(
+    breaks = seq(0, 30, by = 1),
+    name = "Number of zones (among zones with\na difference of at least +/- 1 trips)"
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 40, by = 2),
+    name = "Difference in number of intrazonal trips"
+  ) +
+  theme_minimal()
+
+ggsave("intrazonal_trip_differences.png", plot = p, width = 8, height = 5, dpi = 300)
+
 ```
 
 ```{r}
 intrazonal_locs <- changed_TAZs |>
   right_join(intrazonal_trips)
 
-base_map <- get_tiles(intrazonal_locs,
-                      provider = "CartoDB.Positron",
-                      zoom = 13,
-                      crop = TRUE)
+base_map <- get_tiles(
+  x = intrazonal_locs,
+  provider = "CartoDB.Positron",
+  zoom = 13,
+  crop = TRUE
+)
 
-ggplot(intrazonal_locs) +
+p <- ggplot(intrazonal_locs) +
   geom_spatraster_rgb(data = base_map) +
-  geom_sf(color = "gray",
-          alpha = 0.7,
-          aes(fill = difference)) +
-  scale_fill_viridis_c(transform = "log",
-                       breaks = c(10*2^seq(1, 6, by=1)),
-                       direction = -1,
-                       name = "Increase in\nintrazonal\ntrips") +
+  geom_sf(
+    color = "gray",
+    alpha = 0.7,
+    aes(fill = difference)
+  ) +
+  scale_fill_viridis_c(
+    transform = "log",
+    breaks = c(10 * 2^seq(1, 6, by = 1)),
+    direction = -1,
+    name = "Increase in\nintrazonal\ntrips"
+  ) +
   theme_void()
+
+ggsave("intrazonal_trip_changes_map.png", plot = p, width = 10, height = 7, dpi = 300)
 ```
 
-Desire Lines
+## Desire Lines Comparison
+
+### Map Desire Lines
 
 ```{r}
 changed_TAZ_points <- changed_TAZs |>
@@ -574,6 +645,8 @@ ggplot(desire_line_change) +
   theme_void()
 ```
 
+### Map Desire Lines Gains and Losses Colored Differently
+
 ```{r}
 desire_line_gain <- desire_line_change |>
   filter(difference > 0)
@@ -605,6 +678,8 @@ ggplot() +
   theme_void()
 ```
 
+### Map Desire Lines Gains and Losses on Separate Maps
+
 ```{r}
 gain_map <- ggplot() + 
   geom_spatraster_rgb(data = base_map) +
@@ -634,17 +709,21 @@ legend <- get_legend(loss_map)
 ```
 
 ```{r}
-plot_grid(gain_map + theme(legend.position = "none"), 
-          loss_map + theme(legend.position = "none"), 
-          legend,
-          nrow = 1,
-          labels = c("Trip increases",
-                     "Trip decreases",
-                     ""),
-          label_size = 10,
-          label_y = 0.8,
-          label_x = -0.12)
+p <- plot_grid(
+  gain_map + theme(legend.position = "none"), 
+  loss_map + theme(legend.position = "none"), 
+  legend,
+  nrow = 1,
+  labels = c("Trip increases", "Trip decreases", ""),
+  label_size = 10,
+  label_y = 0.8,
+  label_x = -0.12
+)
+
+ggsave("gain_loss_comparison_map.png", plot = p, width = 12, height = 5, dpi = 300)
 ```
+
+### TAZ with Greatest Gains and Losses
 
 ```{r}
 most_gained_a <- comparison_summary$taz_id[
@@ -674,6 +753,8 @@ tibble(Change = c("Greatest production gain",
   kable(digits = 1)
 ```
 
+### Map TAZ 256
+
 ```{r}
 compare_taz_256 <- comparison |>
   filter(origin == 256 | destination == 256) |>
@@ -690,7 +771,7 @@ base_map <- get_tiles(taz_256_zones,
                       zoom = 12,
                       crop = TRUE)
 
-ggplot(taz_256_zones) +
+d <- ggplot(taz_256_zones) +
   geom_spatraster_rgb(data = base_map) +
   geom_sf(color = "gray",
           aes(fill = difference)) +
@@ -699,4 +780,42 @@ ggplot(taz_256_zones) +
                        high = muted("blue"),
                        midpoint = 0) +
   theme_void()
+
+ggsave("taz_256_difference_map.png", plot = d, width = 10, height = 7, dpi = 300)
+```
+
+### Map TAZ 625
+
+```{r}
+selected_taz <- 625
+
+compare_taz <- comparison |>
+  filter(origin == selected_taz | destination == selected_taz) |>
+  mutate(taz_id = ifelse(origin == selected_taz, destination, origin)) |>
+  group_by(taz_id) |>
+  summarise(difference = sum(difference))
+
+taz_zones <- changed_TAZs |>
+  right_join(compare_taz) |>
+  select(difference)
+
+base_map <- get_tiles(
+  x = taz_zones,
+  provider = "CartoDB.Positron",
+  zoom = 12,
+  crop = TRUE
+)
+
+p <- ggplot(taz_zones) +
+  geom_spatraster_rgb(data = base_map) +
+  geom_sf(aes(fill = difference), color = "gray") +
+  scale_fill_gradient2(
+    low = muted("red"),
+    mid = "white",
+    high = muted("blue"),
+    midpoint = 0
+  ) +
+  theme_void()
+
+ggsave("taz_625_difference_map.png", plot = p, width = 10, height = 7, dpi = 300)
 ```
